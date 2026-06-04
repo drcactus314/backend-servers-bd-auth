@@ -1,8 +1,14 @@
+require('dotenv').config()
+const getConnection =require( "./config/db");
 const express = require("express");
-const app = express();
 const bodyParser = require("body-parser");
-const { error } = require("console");
+const app = express();
 const sqlite = require("sqlite3").verbose();
+require("./config/db");
+const {Task} = require("./models/taskModel");
+
+getConnection();
+
 const dbName = "tasks.db";
 const port = 3000;
 
@@ -16,13 +22,12 @@ let tasks = [
   { id: 5, task: "Help granny" },
 ];
 
-const aPP = app.use(bodyParser.json());
-console.log(aPP);
+app.use(bodyParser.json());
 
-const checkExist = (task, res) => {
+const checkExist = (task, res, error) => {
   if (!task) {
     return res.status(404).json({
-      message: "Завдання не існує",
+      message: error ?? "Завдання не існує",
     });
   }
 };
@@ -42,64 +47,79 @@ app.listen(port, () => {
 });
 
 // Доступаємся до всіх завдань в базі
-app.get("/tasks", (req, res) => {
-  db.all("SELECT * FROM tasks", (err, rows) => {
-    serverError(err, res);
-  });
-  return res.status(200).json(rows);
+app.get("/tasks", async (req, res) => {
+  try {
+    const allTasks = await Task.find();
+     //Тут можна дати умову по якій буде шукати, або фільтр. Також можна додати оператори-фільтри через знак $.
+
+    return res.status(200).json(allTasks);
+  } catch (error) {
+    console.error("Помилка запиту на сервер" + error);
+    serverError(error, res);
+  }
 });
 
 // Доступаємся до завдання по ID
-app.get("/tasks/:id", (req, res) => {
-  // Беремо id зі завдання
-  // Метод парс інт перетворює на число
-  const taskId = parseInt(req.params.id);
-  db.get('SELECT * from tasks WHERE id = ?', taskId, (err, row)=>{
-    serverError(err, res);
-    checkExist(foundTask, res);
-    return res.status(200).json(row);
-  })
+app.get("/tasks/:id", async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const taskID = await Task.findById(taskId);
+
+    checkExist(taskID, res);
+
+    return res.status(200).json(taskID);
+  } catch (error) {
+    console.error("Помилка завдання" + error);
+    serverError(error, res);
+  }
 });
 
 // Записуємо завдання в БазуДаних
-app.post("/tasks", (req, res) => {
-  // Отримуємо дані з тіла запиту
-  const newTask = req.body;
-  // Пушимо в масив
-  db.run("INSERT INTO tasks {text} VALUE {?}", [newTask.text], (err) => {
-    serverError(err, res);
-    return res.status(201).json({ id: this.lastID }, "Ваше завдання додано");
-  });
-  //   tasks.push(newTask);
-  // Відповідаємо статусом про успіх або новоствореного завдання
-  //   return res.status(201).json(newTask);
+app.post("/tasks", async (req, res) => {
+  try {
+    const newTask = req.body;
+    const task = await Task.create({
+      text: newTask.text,
+    });
+
+    checkExist(task, res);
+
+    return res.status(201).json(task, "Ваше завдання додано");
+  } catch (error) {
+    console.error("task creation failed" + error);
+    serverError(error, res);
+  }
 });
 
 // Редагуємо завдання по ID
-app.put("/tasks/:id", (req, res) => {
-  // Беремо id зі завдання
-  // Метод парс інт перетворює на число
-  const { text } = req.body;
-  const taskId = parseInt(req.params.id);
-
-  db.run("UPDATE tasks  SET text = ? WHERE id = ?", [text, taskId], (err) => {
-    serverError(err, res);
+app.put("/tasks/:id", async (req, res) => {
+  try {
+    const { text, isComplited } = req.body;
+    const taskId = req.params.id;
+    const editTask = await Task.findByIdAndUpdate(taskId, {text, isComplited }, {new: true});  //Дуже важливо додати цей параметр, оскільки без нього mongoose верне старий об'єкт
+    checkExist(editTask, res)
     return res.status(200).json({
-      id: taskId,
-      text,
+      editTask
     });
-  });
+  } catch (error) {
+    console.error("Ви не можете редагувати, помилка" + error);
+    serverError(error, res);
+  }
 });
 
 // Видаляємо по id
-app.delete("/tasks/:id", (req, res) => {
-  // Отримуємо ідентифікатор завдання
-  const taskId = parseInt(req.params.id);
-//   tasks = tasks.filter(t=> t.id !== taskId) 
-db.run('DELETE from tasks WWHERE id =?', taskId, (err)=>{
-    serverError();
-    return res.send(204).send()
-})
+app.delete("/tasks/:id", async (req, res) => {
+try {
+    const taskId = req.params.id;
+  const deleteTask = await Task.findByIdAndDelete(taskId);
+  checkExist(deleteTask, res)
+  return res.status(204).send();
+  
+} catch (error) {
+  console.error("Завдання не було видалено через" + error); 
+  serverError(error, res);
+}
 });
 
-
+// ejld3mbBWJ2zrYrI
+// mongodb+srv://arturkril9_db_user:<db_password>@training.omehpum.mongodb.net/?appName=Training
