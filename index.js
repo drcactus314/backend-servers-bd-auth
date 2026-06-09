@@ -49,8 +49,7 @@ app.listen(port, () => {
 // Доступаємся до всіх завдань в базі
 app.get("/tasks", async (req, res) => {
   try {
-    const allTasks = await Task.find();
-     //Тут можна дати умову по якій буде шукати, або фільтр. Також можна додати оператори-фільтри через знак $.
+    const allTasks = await Task.find();   //Тут можна дати умову по якій буде шукати, або фільтр. Також можна додати оператори-фільтри через знак $.
 
     return res.status(200).json(allTasks);
   } catch (error) {
